@@ -1,0 +1,693 @@
+---
+title: "Internet Usage vs Urbanization"
+output:
+  html_document:
+    df_print: paged
+---
+
+
+## Install  the Packages
+
+Uncomment the code below and run the code to install the packages.
+
+```{r}
+install.packages('moments')
+install.packages('vioplot')  
+install.packages("ggpubr")  
+install.packages("glmnet")
+```
+
+
+## Load the Packages
+
+```{r}
+library(tidyverse)  # package for data analysis in R
+library(readxl)  # package for reading excel files
+library(moments)  # package to calculate skewness and kurtosis
+library(tidyr)  # package for data cleaning
+library(vioplot)  # package for violin plot
+library(ggpubr)  # package for correlation analysis
+library(glmnet)  # package for regression analysis
+library(forecast)  # package for time series analysis
+library(tseries)  # package for time series analysis
+```
+
+
+## Load Data
+
+Load the Data_Extract_From_World_Development_Indicators dataset and store it as an object "df".
+
+```{r}
+#df <- read_excel('34998937-06b9-4661-8158-578271315c2d_Data.xlsx')
+# view the first few rows of the dataset 
+
+df <- R_assessment_data
+head(df)
+```
+
+
+## Data Cleaning
+
+Remove the *Time Code*, *Country Code*, *Secure Internet servers [IT.NET.SECR]* and	*Secure Internet servers (per 1 million people) [IT.NET.SECR.P6]* variables. These variables will not be useful for my analysis. 
+
+We have the *Time* variable which shows the year, so we won't need the *Time Code* variable. We also have the *Country Name* variable, so we won't need the *Country Code* variable. The last two variables *Secure Internet servers [IT.NET.SECR]* and *Secure Internet servers (per 1 million people) [IT.NET.SECR.P6]* won't help us with our research objective of seeing how internet usage affects urbanization.
+
+
+```{r}
+# remove some columns from the dataset
+df = df[,!(names(df) %in% c('Time Code', 
+                            'Country Code',
+                            'Secure Internet servers [IT.NET.SECR]',
+                            'Secure Internet servers (per 1 million people) [IT.NET.SECR.P6]'))]
+head(df)
+```
+
+
+### Impute missing values
+
+The missing values will be imputed with the value of the previous year based on the country. For example, for the *Individuals using the Internet (% of population) [IT.NET.USER.ZS]* variable and the country *Germany*, if the value for the year 2020 is *89* and the value for the year 2021 is missing, then the missing value will be imputed with *89*.
+
+
+I will create a function that will help me create separate dataframes for each country. It works by using the filter() function to filter based on the country name.
+
+```{r}
+# create function to filter dataset by country name
+filter_country <- function(value){
+  x <- filter(df, df$`Country Name`==value)
+  return(x)
+}
+
+germany = filter_country("Germany")
+uk = filter_country("United Kingdom")
+us = filter_country("United States")
+belarus = filter_country("Belarus")
+canada = filter_country("Canada")
+jamaica = filter_country("Jamaica")
+nigeria = filter_country("Nigeria")
+egypt = filter_country("Egypt, Arab Rep.")
+burundi = filter_country("Burundi")
+china = filter_country("China")
+bangladesh = filter_country("Bangladesh")
+india = filter_country("India")
+australia = filter_country("Australia")
+nz = filter_country("New Zealand")                         
+```
+
+
+```{r}
+# View the Germany dataframe
+germany
+```
+
+
+You'll notice that the value for the year *2021* is missing in the Germany dataframe. It will be imputed with the value for 2020.
+
+
+```{r}
+# view the nigeria dataframe
+nigeria
+```
+
+
+## Check for missing values in each country dataframe
+
+```{r}
+# Check the total number of missing values in each dataframe
+cat("There are", sum(is.na(germany)), "missing values in the Germany dataframe\n")
+cat("There are", sum(is.na(uk)), "missing values in the United Kingdom dataframe\n")
+cat("There are", sum(is.na(us)), "missing values in the United States dataframe\n")
+cat("There are", sum(is.na(belarus)), "missing values in the Belarus dataframe\n")
+cat("There are", sum(is.na(canada)), "missing values in the Canada dataframe\n")
+cat("There are", sum(is.na(jamaica)), "missing values in the Jamaica dataframe\n")
+cat("There are", sum(is.na(nigeria)), "missing values in the Nigeria dataframe\n")
+cat("There are", sum(is.na(egypt)), "missing values in the Egypt dataframe\n")
+cat("There are", sum(is.na(burundi)), "missing values in the Burundi dataframe\n")
+cat("There are", sum(is.na(china)), "missing values in the China dataframe\n")
+cat("There are", sum(is.na(bangladesh)), "missing values in the Bangladesh dataframe\n")
+cat("There are", sum(is.na(india)), "missing values in the India dataframe\n")
+cat("There are", sum(is.na(australia)), "missing values in the Australia dataframe\n")
+cat("There are", sum(is.na(nz)), "missing values in the New Zealand dataframe\n")
+```
+
+## Replace missing values with the value before it.
+
+Impute the missing values in all the DataFrames.
+
+```{r}
+# create function to impute missing values in all the dataframes with the previous year value
+impute_data <- function(dataframe){
+  x <- fill(dataframe, names(dataframe), .direction="down")
+  return(x)
+}
+
+germany = impute_data(germany)
+uk = impute_data(uk)
+us = impute_data(us)
+belarus = impute_data(belarus)
+canada = impute_data(canada)
+jamaica = impute_data(jamaica)
+nigeria = impute_data(nigeria)
+egypt = impute_data(egypt)
+burundi = impute_data(burundi)
+china = impute_data(china)
+bangladesh = impute_data(bangladesh)
+india = impute_data(india)
+australia = impute_data(australia)
+nz = impute_data(nz)                         
+```
+
+
+Confirm to see if the dataframe has been imputed.
+
+
+```{r}
+# check if missing value has been imputed
+tail(germany)
+```
+
+There were 3 missing values in the jamaica dataframe. Check if they have been imputed.
+
+```{r}
+# check if missing value has been imputed
+tail(jamaica)
+```
+
+## Check if the dataframes still have missing values in them.
+
+```{r}
+# Verify that there is no missing data
+cat("There are", sum(is.na(germany)), "missing values in the Germany dataframe\n")
+cat("There are", sum(is.na(uk)), "missing values in the United Kingdom dataframe\n")
+cat("There are", sum(is.na(us)), "missing values in the United States dataframe\n")
+cat("There are", sum(is.na(belarus)), "missing values in the Belarus dataframe\n")
+cat("There are", sum(is.na(canada)), "missing values in the Canada dataframe\n")
+cat("There are", sum(is.na(jamaica)), "missing values in the Jamaica dataframe\n")
+cat("There are", sum(is.na(nigeria)), "missing values in the Nigeria dataframe\n")
+cat("There are", sum(is.na(egypt)), "missing values in the Egypt dataframe\n")
+cat("There are", sum(is.na(burundi)), "missing values in the Burundi dataframe\n")
+cat("There are", sum(is.na(china)), "missing values in the China dataframe\n")
+cat("There are", sum(is.na(bangladesh)), "missing values in the Bangladesh dataframe\n")
+cat("There are", sum(is.na(india)), "missing values in the India dataframe\n")
+cat("There are", sum(is.na(australia)), "missing values in the Australia dataframe\n")
+cat("There are", sum(is.na(nz)), "missing values in the New Zealand dataframe\n")
+```
+
+
+# Descriptive Statistics
+
+Check the minimum value, maximum value, 1st quartile, mean, 3rd quartile, skewness and kurtosis of each variable in each dataframe. I will use the summary(), skewness() and kurtosis() functions to achieve this.
+
+
+```{r}
+# Create function to calculate the skewness and kurtosis of each variable in each country dataframe
+
+skewness_and_kurtosis <- function(dataframe){
+  cat('The skewness of the Individuals using the Internet (% of population) variable is', skewness(dataframe$`Individuals using the Internet (% of population) [IT.NET.USER.ZS]`), '\n')
+  cat('The kurtosis of the Individuals using the Internet (% of population) variable is', kurtosis(dataframe$`Individuals using the Internet (% of population) [IT.NET.USER.ZS]`), '\n')
+  
+   cat('The skewness of the Urban population variable is', skewness(dataframe$`Urban population [SP.URB.TOTL]`), '\n')
+  cat('The kurtosis of the Urban population variable is', kurtosis(dataframe$`Urban population [SP.URB.TOTL]`), '\n')
+  
+  cat('The skewness of the Rural population variable is', skewness(dataframe$`Rural population [SP.RUR.TOTL]`), '\n')
+  cat('The kurtosis of the Rural population variable is', kurtosis(dataframe$`Rural population [SP.RUR.TOTL]`), '\n')
+}
+```
+
+
+```{r}
+summary(germany)
+skewness_and_kurtosis(germany)
+```
+
+```{r}
+summary(uk)
+skewness_and_kurtosis(uk)
+```
+
+
+```{r}
+summary(us)
+skewness_and_kurtosis(us)
+```
+
+
+```{r}
+summary(belarus)
+skewness_and_kurtosis(belarus)
+```
+
+
+```{r}
+summary(canada)
+skewness_and_kurtosis(canada)
+```
+
+
+```{r}
+summary(jamaica)
+skewness_and_kurtosis(jamaica)
+```
+
+
+```{r}
+summary(nigeria)
+skewness_and_kurtosis(nigeria)
+```
+
+```{r}
+summary(egypt)
+skewness_and_kurtosis(egypt)
+```
+
+
+```{r}
+summary(burundi)
+skewness_and_kurtosis(burundi)
+```
+
+
+```{r}
+summary(china)
+skewness_and_kurtosis(china)
+```
+
+
+```{r}
+summary(bangladesh)
+skewness_and_kurtosis(bangladesh)
+```
+
+
+```{r}
+summary(india)
+skewness_and_kurtosis(india)
+```
+
+
+```{r}
+summary(australia)
+skewness_and_kurtosis(australia)
+```
+
+
+```{r}
+summary(nz)
+skewness_and_kurtosis(nz)
+```
+
+
+## Exploratory Data Analysis
+
+I will check for outliers by using a histogram.
+
+```{r}
+ggplot(data=germany) +
+  geom_boxplot(mapping=aes(y=`Urban population [SP.URB.TOTL]`), fill='gold') + 
+  labs(title='Histogram of Urban population in Nigeria') + 
+  # centralize the title
+  theme(plot.title = element_text(hjust=0.5)) + 
+  ylab('Urban Population') +
+  xlab('Count') #+ 
+  #facet_wrap(~dem.dum)
+```
+
+### Let's check to see if the number of internet users in developed countries is higher than those in developing countries. 
+
+For the developed countries, I will used Germany, Australia, UK, US, and Canada.
+
+For developing countries, I will use Jamaica, Nigeria, Egypt, Burundi, and India.
+
+```{r }
+# Violin Plots of Internet Usage
+x1 <- germany$`Individuals using the Internet (% of population) [IT.NET.USER.ZS]`
+x2 <- australia$`Individuals using the Internet (% of population) [IT.NET.USER.ZS]`
+x3 <- uk$`Individuals using the Internet (% of population) [IT.NET.USER.ZS]`
+x4 <- us$`Individuals using the Internet (% of population) [IT.NET.USER.ZS]`
+x5 <- canada$`Individuals using the Internet (% of population) [IT.NET.USER.ZS]`
+x6 <- jamaica$`Individuals using the Internet (% of population) [IT.NET.USER.ZS]`
+x7 <- nigeria$`Individuals using the Internet (% of population) [IT.NET.USER.ZS]`
+x8 <- egypt$`Individuals using the Internet (% of population) [IT.NET.USER.ZS]`
+x9 <- burundi$`Individuals using the Internet (% of population) [IT.NET.USER.ZS]`
+x10 <- india$`Individuals using the Internet (% of population) [IT.NET.USER.ZS]`
+
+vioplot(x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, names=c("Germany", "Australia", "UK", "US", "Canada", "Jamaica", "Nigeria", "Egypt", "Burundi", "India"), col="gold", xlab='Countries', ylab='Count')
+
+title("Individual Using Internet (% of population)")
+```
+
+A higher percentage of people in developed countries use the internet more than people in developing countries.
+
+
+### Let's check the Urban population in developed countries and developing countries.
+
+```{r }
+# Violin Plots of Urban Population
+x1 <- germany$`Urban population [SP.URB.TOTL]`
+x2 <- australia$`Urban population [SP.URB.TOTL]`
+x3 <- uk$`Urban population [SP.URB.TOTL]`
+x4 <- us$`Urban population [SP.URB.TOTL]`
+x5 <- canada$`Urban population [SP.URB.TOTL]`
+x6 <- jamaica$`Urban population [SP.URB.TOTL]`
+x7 <- nigeria$`Urban population [SP.URB.TOTL]`
+x8 <- egypt$`Urban population [SP.URB.TOTL]`
+x9 <- burundi$`Urban population [SP.URB.TOTL]`
+x10 <- india$`Urban population [SP.URB.TOTL]`
+
+vioplot(x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, names=c("Germany", "Australia", "UK", "US", "Canada", "Jamaica", "Nigeria", "Egypt", "Burundi", "India"), col="gold", xlab='Countries', ylab='Count')
+
+title("Urban Population")
+```
+
+The country India has the highest urban population, followed by the US and Nigeria.
+
+
+### Let's check the rural population in developed countries and developing countries.
+
+```{r }
+# Violin Plots of Rural Population
+x1 <- germany$`Rural population [SP.RUR.TOTL]`
+x2 <- australia$`Rural population [SP.RUR.TOTL]`
+x3 <- uk$`Rural population [SP.RUR.TOTL]`
+x4 <- us$`Rural population [SP.RUR.TOTL]`
+x5 <- canada$`Rural population [SP.RUR.TOTL]`
+x6 <- jamaica$`Rural population [SP.RUR.TOTL]`
+x7 <- nigeria$`Rural population [SP.RUR.TOTL]`
+x8 <- egypt$`Rural population [SP.RUR.TOTL]`
+x9 <- burundi$`Rural population [SP.RUR.TOTL]`
+x10 <- india$`Rural population [SP.RUR.TOTL]`
+
+vioplot(x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, names=c("Germany", "Australia", "UK", "US", "Canada", "Jamaica", "Nigeria", "Egypt", "Burundi", "India"), col="gold", xlab='Countries', ylab='Count')
+
+title("Rural Population")
+```
+
+The country India has the highest rural population, followed by Nigeria.
+
+
+## Correlation Analysis
+
+I will check the correlation between the Individuals using the Internet (% of population) and the Urban population variables for the different countries. I will use the `cor.test()` function from the `ggpubr` package to get the Pearson correlation.
+
+```{r}
+# Funtion to check the correlation between the Individuals using the Internet (% of population)
+# and the Urban population variables for different countries
+
+correlation.urban <- function(dataframe){
+  cor.test(dataframe$`Individuals using the Internet (% of population) [IT.NET.USER.ZS]`, 
+           dataframe$`Urban population [SP.URB.TOTL]`, method="pearson")
+}
+```
+
+
+```{r}
+# correlation analysis for Germany
+correlation.urban(germany)
+```
+
+
+```{r}
+# correlation analysis for UK
+correlation.urban(uk)
+```
+
+```{r}
+# correlation analysis for US
+correlation.urban(us)
+```
+
+
+```{r}
+# correlation analysis for belarus
+correlation.urban(belarus)
+```
+
+
+```{r}
+# correlation analysis for Canada
+correlation.urban(canada)
+```
+
+
+```{r}
+# correlation analysis for Jamaica
+correlation.urban(jamaica)
+```
+
+
+
+```{r}
+# correlation analysis for Nigeria
+correlation.urban(nigeria)
+```
+
+
+There is a high positive correlation between the Internet (% of population) and the Urban population variables. For UK, the correlation is 90.7%. For the country Nigeria, the correlation is 99.49%.
+
+
+```{r}
+# correlation analysis for Egypt
+correlation.urban(egypt)
+```
+
+
+```{r}
+# correlation analysis for Burundi
+correlation.urban(burundi)
+```
+
+```{r}
+# correlation analysis for China
+correlation.urban(china)
+```
+
+
+```{r}
+# correlation analysis for Bangladesh
+correlation.urban(bangladesh)
+```
+
+
+```{r}
+# correlation analysis for India
+correlation.urban(india)
+```
+
+
+```{r}
+# correlation analysis for Australia
+correlation.urban(australia)
+```
+
+
+```{r}
+# correlation analysis for New Zealand
+correlation.urban(nz)
+```
+
+
+## Regression Analysis
+
+Use the linear regression algorithm to do regression analysis on the country UK.
+
+```{r}
+plot(uk$`Urban population [SP.URB.TOTL]`,
+     uk$`Individuals using the Internet (% of population) [IT.NET.USER.ZS]`,
+     xlab = 'Urban Population',
+     ylab = 'Individual Using the Internet (%)')
+```
+
+From the plot above, as the urban population increases, the number of individual using the internet also increases.
+
+
+### Build linear regression model
+
+```{r warning=FALSE}
+linear_reg.uk <- lm(uk$`Individuals using the Internet (% of population) [IT.NET.USER.ZS]` ~ uk$`Urban population [SP.URB.TOTL]` )
+
+summary(linear_reg.uk)
+```
+
+```{r warning=FALSE}
+plot(uk$`Urban population [SP.URB.TOTL]`,
+     uk$`Individuals using the Internet (% of population) [IT.NET.USER.ZS]`,
+     xlab = 'Urban Population',
+     ylab = 'Individual Using the Internet (%)')
+# plot regression line
+abline(linear_reg.uk, col='blue')
+```
+
+
+### Build Ridge regression model
+
+```{r}
+# split data into training set and test set
+# use 70% of the data for training and 30% for testing
+print("Training Dataset")
+training_data  <- uk %>% dplyr::sample_frac(0.7)
+print(training_data)
+print("Testing Dataset")
+testing_data   <- dplyr::anti_join(uk,
+                                  training_data, by='Time')
+print(testing_data)
+```
+
+Use the urban population and rural population to predict the individuals using the internet
+
+```{r}
+# Split feature and target variable
+# training feature and labels
+x.train <- select(training_data, `Urban population [SP.URB.TOTL]`, `Rural population [SP.RUR.TOTL]`)
+y.train <- training_data$`Individuals using the Internet (% of population) [IT.NET.USER.ZS]`
+
+# testing features and labels
+x.test <- select(testing_data, `Urban population [SP.URB.TOTL]`, `Rural population [SP.RUR.TOTL]`)
+y.test <- testing_data$`Individuals using the Internet (% of population) [IT.NET.USER.ZS]`
+print(x.train)
+print(y.train)
+print(x.test)
+print(y.test)
+```
+
+
+```{r}
+# Fit Ridge model to the training data
+ridge_model <- cv.glmnet(as.matrix(x.train), 
+                         y.train, 
+                         type.measure='mse', 
+                         alpha=0, 
+                         family="gaussian")  # evaluate model with the mean squared error
+
+summary(ridge_model)
+```
+
+```{r}
+# use the predict() function to make predictions on the 
+y_pred <- predict(ridge_model,
+                  s=ridge_model$lambda.1se,
+                  newx=as.matrix(x.test))
+mean((y.test - y_pred)^2)
+```
+
+
+## Time Series Analysis
+
+For time series analysis, i will try to predict the future urban population of UK.
+
+```{r}
+# Make a basic graph
+ggplot(uk,aes(x=Time))+
+  geom_line(aes(y=`Urban population [SP.URB.TOTL]`), color="blue") +
+  xlab("Years") +   # add xlabel
+  ylab("Urban Population") +   # add ylabel
+  labs(title="Time-Series Of the Urban Population in UK") +  # add title
+  theme(plot.title = element_text(hjust=0.5))  # centralize the title
+```
+
+
+```{r}
+# Make a basic graph
+ggplot(uk,aes(x=Time)) +
+  geom_line(aes(y=`Rural population [SP.RUR.TOTL]`), color="red") +
+  xlab("Years") + 
+  ylab("Rural Population") + 
+  labs(title="Time-Series Of the Rural Population in UK") +  # add title
+  theme(plot.title = element_text(hjust=0.5))  # centralize the title
+```
+
+
+The time series plots of the urban population and rural population show trend. You'll notice that the urban population is increasing with time. The rural population is decreasing with time.
+
+I will use ARIMA model for the time series analysis. The goal is to forecast the future urban population.
+
+
+```{r}
+# Convert the dataframe to time-series data
+# specify the start time to the earliest date in the time series (2007) and the end to be the latest date in the time series (2021)
+# set the frequency to 1 for yearly prediction
+uk.ts <- ts(uk$`Urban population [SP.URB.TOTL]`, start=min(uk$Time), end=max(uk$Time), frequency=1)
+# confirm that data is a time series data
+class(uk.ts)
+```
+
+```{r}
+plot(uk.ts)  # plot the time series data
+```
+
+
+
+
+```{r}
+# check the autocorrelation of the time-series data
+acf(uk.ts)
+```
+
+Some points have cross the blue line. It means there is high autocorrelation in the data. The data is not stationary.
+
+
+```{r}
+# use the dickey-fuller test to check if the data is stationery
+adf.test(uk.ts)
+```
+ The p-value is greater than 0.05, therefore, the data is not stationary.
+ 
+ I will use Auto-ARIMA to convert the data from non-stationary to stationary.
+
+
+```{r}
+# use ARIMA
+uk.model <- auto.arima(uk.ts, ic="aic", trace=TRUE)
+```
+
+```{r}
+# check the model
+uk.model
+```
+
+### Let's check if the model is now stationary.
+
+```{r}
+# check if the data is now stationary
+acf(ts(uk.model$residuals))
+```
+
+Most of the points are below the blue dotted line. This means the data is stationary.
+
+Let's now use our model to forecast the future.
+
+```{r}
+# set the confidence interval to 95%. We will make predictions for the next 10 years.
+uk.forecast <- forecast(uk.model, level=c(95), h=10*1)
+uk.forecast
+```
+
+### Plot the forecast
+
+```{r}
+plot(uk.forecast)
+```
+
+
+### Validate the forecast
+
+```{r}
+Box.test(uk.forecast$resid, lag=5, type="Ljung-Box")
+```
+
+The p-value is greater than 0.05. It means the data doesn't have any autocorrelation.
+
+
+## Save cleaned dataset
+
+I will merge all the countries dataframes into one dataframe, `df.new`.
+
+```{r}
+# Merge all the countries dataframes
+df.new <- rbind(germany, uk, us, belarus, canada, jamaica, nigeria, egypt, burundi, china, bangladesh, india, australia, nz)
+
+# sort the dataset based on time with the order() function
+df.new <- df.new[order(df.new$Time),]
+# save data to a csv file
+write.csv(df.new, 'Data_Extract_From_World_Development_Indicators_Cleaned.csv', row.names=FALSE)
+head(df.new)  # view sorted dataframe
+```
+
